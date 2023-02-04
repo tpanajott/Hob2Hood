@@ -1,0 +1,10 @@
+### Missing 3D models - created on 2023-02-04 13:22
+### Printed by checking_3D_models plugin
+Board file: /mnt/NAS/Homelab/Projects/KiCad/ParentsHob2HoodController/ParentsHob2HoodController.kicad_pcb
+3D missing models written to:
+/mnt/NAS/Homelab/Projects/KiCad/ParentsHob2HoodController/ParentsHob2HoodController_missing3Dmodels.txt
+-------
+('SW1', '/usr/share/kicad/3dmodels/Button_Switch_SMD.3dshapes/SW_Push_SPST_NO_Alps_SKRK.wrl')
+-------
+NUM of 3D missing models:1
+checked extensions ['.stp', '.step', '.stpZ']
