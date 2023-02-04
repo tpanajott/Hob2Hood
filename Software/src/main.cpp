@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <string.h>
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include <Mcp320x.h>
@@ -24,13 +25,13 @@
 #define MCP_CHANNEL_FAN_4 6
 #define MCP_CHANNEL_UNKNOWN 1
 
-#define HEX_LIGHTS_ON "0x000"
-#define HEX_LIGHTS_OFF "0x000"
-#define HEX_FAN_OFF "0x000"
-#define HEX_FAN_1 "0x000"
-#define HEX_FAN_2 "0x000"
-#define HEX_FAN_3 "0x000"
-#define HEX_FAN_4 "0x000"
+#define HEX_FAN_OFF     0x055303A3
+#define HEX_FAN_1       0xE3C01BE2
+#define HEX_FAN_2       0xD051C301
+#define HEX_FAN_3       0xC22FFFD7
+#define HEX_FAN_4       0xB9121B29
+#define HEX_LIGHT_ON    0xE208293C
+#define HEX_LIGHT_OFF   0x24ACF947
 
 SoftwareSerial debugSerial(5, 6); // PD5 RX, PD6 TX
 
@@ -47,6 +48,7 @@ decode_results results;
 // Set fan speed, a speed of 0 = fan off
 void setFanSpeed(uint8_t speed)
 {
+  debugSerial.print("Fan speed: "); debugSerial.println(speed);
   if (speed == 0)
   {
     digitalWrite(PIN_FAN_1, LOW);
@@ -96,6 +98,7 @@ void setFanSpeed(uint8_t speed)
 // Set the light state
 void setLightState(bool state)
 {
+  debugSerial.print("Lights: "); debugSerial.println(state ? "ON" : "OFF");
   digitalWrite(PIN_LIGHTS, state ? HIGH : LOW);
 }
 
@@ -144,14 +147,39 @@ void readButtonStates()
 void receiveIRCommand()
 {
   // have we received an IR signal?
-  if (irrecv.decode(&results))
+  // if (irrecv.decode(&results))
+  if (irrecv.decode())
   {
-    debugSerial.println("Received IR command: ");
-    debugSerial.println(results.value, HEX); // display it on serial monitor in hexadecimal
-    // std::string bytesToHexString(const std::vector<uint8_t>& value) {
-    // std::ostringstream oss;
-    // oss << std::hex << std::setfill('0');
-    // Serial.println(oss.str());
+    // debugSerial.println("Received IR command: ");
+    // debugSerial.println(results.value, HEX); // display it on serial monitor in hexadecimal
+    switch (irrecv.decodedIRData.decodedRawData)
+    {
+      case HEX_LIGHT_ON:
+        setLightState(true);
+        break;
+      case HEX_LIGHT_OFF:
+        setLightState(false);
+        break;
+      case HEX_FAN_OFF:
+        setFanSpeed(0);
+        break;
+      case HEX_FAN_1:
+        setFanSpeed(1);
+        break;
+      case HEX_FAN_2:
+        setFanSpeed(2);
+        break;
+      case HEX_FAN_3:
+        setFanSpeed(3);
+        break;
+      case HEX_FAN_4:
+        setFanSpeed(4);
+        break;
+    
+      default:
+        debugSerial.print("Unknown hex: "); Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+        break;
+    }
 
     irrecv.resume(); // receive the next value
   }
