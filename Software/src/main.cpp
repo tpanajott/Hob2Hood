@@ -1,225 +1,323 @@
 #include <Arduino.h>
 #include <string.h>
-#include <SoftwareSerial.h>
-#include <SPI.h>
-#include <Mcp320x.h>
 #include <IRremote.h>
+#include <Bounce2.h>
 
 #define PIN_IR_RECV 2
-#define PIN_EXT_FAN A1
+#define PIN_CTRL_EXT_FAN A1
 
-#define PIN_LIGHTS A5
-#define PIN_FAN_1 1
-#define PIN_FAN_2 A4
-#define PIN_FAN_3 3
-#define PIN_FAN_4 4
-#define PIN_RELAY_UNKNOWN 0
+// Pins that control the relays
+#define PIN_CTRL_LIGHTS 16 // 16/A2
+#define PIN_CTRL_FAN_1 18  // 18/A4
+#define PIN_CTRL_FAN_2 19  // 19/A5
+#define PIN_CTRL_FAN_3 3
+#define PIN_CTRL_FAN_4 4
+#define PIN_CTRL_RELAY_UNKNOWN 0
 
-#define PIN_MCP_CS 10
-#define PIN_MCP_VREF 5000
-#define MCP_READ_INTERVAL_MS 250
-#define MCP_CHANNEL_LIGHTS 0
-#define MCP_CHANNEL_FAN_1 3
-#define MCP_CHANNEL_FAN_2 2
-#define MCP_CHANNEL_FAN_3 4
-#define MCP_CHANNEL_FAN_4 6
-#define MCP_CHANNEL_UNKNOWN 1
+// Pins that read the input from the manual controls
+#define PIN_MAN_LIGHTS 5
+#define PIN_MAN_FAN_1 8
+#define PIN_MAN_FAN_2 7
+#define PIN_MAN_FAN_3 9
+#define PIN_MAN_FAN_4 10
 
-#define HEX_FAN_OFF     0x055303A3
-#define HEX_FAN_1       0xE3C01BE2
-#define HEX_FAN_2       0xD051C301
-#define HEX_FAN_3       0xC22FFFD7
-#define HEX_FAN_4       0xB9121B29
-#define HEX_LIGHT_ON    0xE208293C
-#define HEX_LIGHT_OFF   0x24ACF947
+// Test HEX values
+// #define HEX_FAN_OFF 0x180C
+// #define HEX_FAN_1 0x5878
+// #define HEX_FAN_2 0x587B
+// #define HEX_FAN_3 0x5879
+// #define HEX_FAN_4 0x587A
+// #define HEX_LIGHT_ON 0x5877
+// #define HEX_LIGHT_OFF 0x184B
 
-SoftwareSerial debugSerial(5, 6); // PD5 RX, PD6 TX
+// Real HEX values:
+#define HEX_FAN_OFF 0x055303A3
+#define HEX_FAN_1 0xE3C01BE2
+#define HEX_FAN_2 0xD051C301
+#define HEX_FAN_3 0xC22FFFD7
+#define HEX_FAN_4 0xB9121B29
+#define HEX_LIGHT_ON 0xE208293C
+#define HEX_LIGHT_OFF 0x24ACF947
 
-MCP3208 adc(PIN_MCP_VREF, PIN_MCP_CS);
-uint16_t analogButtonThresholds[6] = {3000, 3000, 3000, 3000, 3000, 3000}; // Values in mV
-uint16_t analogButtonValues[6];
 uint8_t manualFanSpeed = 0;
+uint8_t lastManualFanSpeed = 0;
 bool manualLightState = false;
-unsigned long lastMCPRead = 0;
+bool lastManualLightState = false;
+
+// Button debounce instances
+Bounce btnLightControl = Bounce();
+Bounce btnFan1 = Bounce();
+Bounce btnFan2 = Bounce();
+Bounce btnFan3 = Bounce();
+Bounce btnFan4 = Bounce();
 
 IRrecv irrecv(2); // create instance of 'irrecv'
-decode_results results;
+// decode_results results;
 
-// Set fan speed, a speed of 0 = fan off
+/**
+ * @brief Set the Fan Speed. A speed of 0 indicates OFF
+ *
+ * @param speed
+ */
 void setFanSpeed(uint8_t speed)
 {
-  debugSerial.print("Fan speed: "); debugSerial.println(speed);
+  Serial.print("Fan speed: ");
+  Serial.println(speed);
   if (speed == 0)
   {
-    digitalWrite(PIN_FAN_1, LOW);
-    digitalWrite(PIN_FAN_2, LOW);
-    digitalWrite(PIN_FAN_3, LOW);
-    digitalWrite(PIN_FAN_4, LOW);
-    digitalWrite(PIN_EXT_FAN, LOW);
+    digitalWrite(PIN_CTRL_FAN_1, LOW);
+    digitalWrite(PIN_CTRL_FAN_2, LOW);
+    digitalWrite(PIN_CTRL_FAN_3, LOW);
+    digitalWrite(PIN_CTRL_FAN_4, LOW);
+    digitalWrite(PIN_CTRL_EXT_FAN, LOW);
   }
   else if (speed == 1)
   {
-    digitalWrite(PIN_FAN_2, LOW);
-    digitalWrite(PIN_FAN_3, LOW);
-    digitalWrite(PIN_FAN_4, LOW);
+    digitalWrite(PIN_CTRL_FAN_2, LOW);
+    digitalWrite(PIN_CTRL_FAN_3, LOW);
+    digitalWrite(PIN_CTRL_FAN_4, LOW);
     delay(100);
-    digitalWrite(PIN_FAN_1, HIGH);
-    digitalWrite(PIN_EXT_FAN, HIGH);
+    digitalWrite(PIN_CTRL_FAN_1, HIGH);
+    digitalWrite(PIN_CTRL_EXT_FAN, HIGH);
   }
   else if (speed == 2)
   {
-    digitalWrite(PIN_FAN_1, LOW);
-    digitalWrite(PIN_FAN_3, LOW);
-    digitalWrite(PIN_FAN_4, LOW);
+    digitalWrite(PIN_CTRL_FAN_1, LOW);
+    digitalWrite(PIN_CTRL_FAN_3, LOW);
+    digitalWrite(PIN_CTRL_FAN_4, LOW);
     delay(100);
-    digitalWrite(PIN_FAN_2, HIGH);
-    digitalWrite(PIN_EXT_FAN, HIGH);
+    digitalWrite(PIN_CTRL_FAN_2, HIGH);
+    digitalWrite(PIN_CTRL_EXT_FAN, HIGH);
   }
   else if (speed == 3)
   {
-    digitalWrite(PIN_FAN_1, LOW);
-    digitalWrite(PIN_FAN_2, LOW);
-    digitalWrite(PIN_FAN_4, LOW);
+    digitalWrite(PIN_CTRL_FAN_1, LOW);
+    digitalWrite(PIN_CTRL_FAN_2, LOW);
+    digitalWrite(PIN_CTRL_FAN_4, LOW);
     delay(100);
-    digitalWrite(PIN_FAN_3, HIGH);
-    digitalWrite(PIN_EXT_FAN, HIGH);
+    digitalWrite(PIN_CTRL_FAN_3, HIGH);
+    digitalWrite(PIN_CTRL_EXT_FAN, HIGH);
   }
   else if (speed == 4)
   {
-    digitalWrite(PIN_FAN_1, LOW);
-    digitalWrite(PIN_FAN_2, LOW);
-    digitalWrite(PIN_FAN_3, LOW);
+    digitalWrite(PIN_CTRL_FAN_1, LOW);
+    digitalWrite(PIN_CTRL_FAN_2, LOW);
+    digitalWrite(PIN_CTRL_FAN_3, LOW);
     delay(100);
-    digitalWrite(PIN_FAN_4, HIGH);
-    digitalWrite(PIN_EXT_FAN, HIGH);
+    digitalWrite(PIN_CTRL_FAN_4, HIGH);
+    digitalWrite(PIN_CTRL_EXT_FAN, HIGH);
   }
 }
 
-// Set the light state
+/**
+ * @brief Set the Light State
+ *
+ * @param state
+ */
 void setLightState(bool state)
 {
-  debugSerial.print("Lights: "); debugSerial.println(state ? "ON" : "OFF");
-  digitalWrite(PIN_LIGHTS, state ? HIGH : LOW);
+  Serial.print("Lights: ");
+  Serial.println(state ? "ON" : "OFF");
+  digitalWrite(PIN_CTRL_LIGHTS, state ? HIGH : LOW);
 }
 
+/**
+ * @brief Read inputs from manual control button and make decisions based on the input.
+ * If ANY input is high, manualControl will be set to true, else, set to false.
+ */
 void readButtonStates()
 {
-  analogButtonValues[0] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_0));
-  analogButtonValues[1] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_1));
-  analogButtonValues[2] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_2));
-  analogButtonValues[3] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_3));
-  analogButtonValues[4] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_4));
-  analogButtonValues[5] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_5));
-  analogButtonValues[6] = adc.toAnalog(adc.read(MCP3208::Channel::SINGLE_6));
+  btnLightControl.update();
+  btnFan1.update();
+  btnFan2.update();
+  btnFan3.update();
+  btnFan4.update();
 
-  if (analogButtonValues[MCP_CHANNEL_LIGHTS] >= analogButtonThresholds[MCP_CHANNEL_LIGHTS])
+  bool newManualLightState = lastManualLightState;
+  uint8_t newManualFanSpeed = lastManualFanSpeed;
+
+  // Control the state of the light
+  if (btnLightControl.rose())
   {
-    manualLightState = true;
+    newManualLightState = true;
+    setLightState(true);
   }
-  else
+  else if (btnLightControl.fell())
   {
-    manualLightState = false;
+    newManualLightState = false;
+    setLightState(false);
   }
 
-  if (analogButtonValues[MCP_CHANNEL_FAN_1] >= analogButtonThresholds[MCP_CHANNEL_FAN_1])
+  if (btnFan1.rose())
   {
-    manualFanSpeed = 1;
+    newManualFanSpeed = 1;
+    setFanSpeed(1);
   }
-  else if (analogButtonValues[MCP_CHANNEL_FAN_2] >= analogButtonThresholds[MCP_CHANNEL_FAN_2])
+  else if (btnFan2.rose())
   {
-    manualFanSpeed = 2;
+    newManualFanSpeed = 2;
+    setFanSpeed(2);
   }
-  else if (analogButtonValues[MCP_CHANNEL_FAN_3] >= analogButtonThresholds[MCP_CHANNEL_FAN_3])
+  else if (btnFan3.rose())
   {
-    manualFanSpeed = 3;
+    newManualFanSpeed = 3;
+    setFanSpeed(3);
   }
-  else if (analogButtonValues[MCP_CHANNEL_FAN_4] >= analogButtonThresholds[MCP_CHANNEL_FAN_2])
+  else if (btnFan4.rose())
   {
-    manualFanSpeed = 4;
+    newManualFanSpeed = 4;
+    setFanSpeed(4);
   }
-  else
+  else if (btnFan1.fell() && btnFan1.read() == LOW && btnFan2.read() == LOW && btnFan3.read() == LOW && btnFan4.read() == LOW)
   {
-    manualFanSpeed = 0;
+    // Button 1 fell (ie. is no longer pressed) and all the other fan buttons are depressed.
+    // This means that no fan speed is currently selected manually.
+    setFanSpeed(0);
+    newManualFanSpeed = 0;
+  }
+
+  if (lastManualLightState != newManualLightState || lastManualFanSpeed != newManualFanSpeed)
+  {
+    // New values are going to be set.
+    if (!newManualLightState && newManualFanSpeed == 0)
+    {
+      // No manual controls available. Start the IR timer.
+      Serial.println("Manual control disabled! Starting IR reciving.");
+      irrecv.start();
+    }
+    else
+    {
+      Serial.println("Manual control enabled! Stopping IR reciving.");
+      irrecv.stop();
+    }
+
+    lastManualLightState = newManualLightState;
+    lastManualFanSpeed = newManualFanSpeed;
+
+    manualLightState = newManualLightState;
+    manualFanSpeed = newManualFanSpeed;
   }
 }
 
-// Receive and decode IR commands and control hood upon received command
-void receiveIRCommand()
+void loop()
 {
-  // have we received an IR signal?
-  // if (irrecv.decode(&results))
-  if (irrecv.decode())
+  readButtonStates(); // Read and act according to manual button states.
+
+  // Manual controls are not used AND we received a IR code
+  if (manualFanSpeed == 0 && !manualLightState && irrecv.decode())
   {
-    // debugSerial.println("Received IR command: ");
-    // debugSerial.println(results.value, HEX); // display it on serial monitor in hexadecimal
+    // have we received an IR signal?
     switch (irrecv.decodedIRData.decodedRawData)
     {
-      case HEX_LIGHT_ON:
-        setLightState(true);
-        break;
-      case HEX_LIGHT_OFF:
-        setLightState(false);
-        break;
-      case HEX_FAN_OFF:
-        setFanSpeed(0);
-        break;
-      case HEX_FAN_1:
-        setFanSpeed(1);
-        break;
-      case HEX_FAN_2:
-        setFanSpeed(2);
-        break;
-      case HEX_FAN_3:
-        setFanSpeed(3);
-        break;
-      case HEX_FAN_4:
-        setFanSpeed(4);
-        break;
-    
-      default:
-        debugSerial.print("Unknown hex: "); Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
-        break;
+    case HEX_LIGHT_ON:
+      setLightState(true);
+      break;
+    case HEX_LIGHT_OFF:
+      setLightState(false);
+      break;
+    case HEX_FAN_OFF:
+      setFanSpeed(0);
+      break;
+    case HEX_FAN_1:
+      setFanSpeed(1);
+      break;
+    case HEX_FAN_2:
+      setFanSpeed(2);
+      break;
+    case HEX_FAN_3:
+      setFanSpeed(3);
+      break;
+    case HEX_FAN_4:
+      setFanSpeed(4);
+      break;
+
+    default:
+      // Serial.print("Unknown hex: ");
+      // Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+      break;
     }
 
     irrecv.resume(); // receive the next value
   }
 }
 
-void loop()
-{
-  receiveIRCommand();
-
-  if (millis() - lastMCPRead >= MCP_READ_INTERVAL_MS)
-  {
-    readButtonStates();
-  }
-}
-
 void setup()
 {
+  Serial.begin(115200); // for serial monitor output
+  Serial.println("Hob2Hood Starting ...");
+
   // Setup outputs to fan and set default OFF state
-  pinMode(PIN_LIGHTS, OUTPUT);
-  pinMode(PIN_FAN_1, OUTPUT);
-  pinMode(PIN_FAN_2, OUTPUT);
-  pinMode(PIN_FAN_3, OUTPUT);
-  pinMode(PIN_FAN_4, OUTPUT);
+  pinMode(PIN_CTRL_LIGHTS, OUTPUT);
+  pinMode(PIN_CTRL_FAN_1, OUTPUT);
+  pinMode(PIN_CTRL_FAN_2, OUTPUT);
+  pinMode(PIN_CTRL_FAN_3, OUTPUT);
+  pinMode(PIN_CTRL_FAN_4, OUTPUT);
+  pinMode(PIN_CTRL_EXT_FAN, OUTPUT);
   setFanSpeed(0);
   setLightState(false);
 
   // Setup input from buttons
-  pinMode(PIN_MCP_CS, OUTPUT);
-  digitalWrite(PIN_MCP_CS, HIGH);
+  btnLightControl.attach(PIN_MAN_LIGHTS, INPUT);
+  btnFan1.attach(PIN_MAN_FAN_1, INPUT);
+  btnFan2.attach(PIN_MAN_FAN_2, INPUT);
+  btnFan3.attach(PIN_MAN_FAN_3, INPUT);
+  btnFan4.attach(PIN_MAN_FAN_4, INPUT);
 
-  // Setup SPI
-  SPISettings settings(1600000, MSBFIRST, SPI_MODE0);
-  SPI.begin();
-  SPI.beginTransaction(settings);
+  // Setup button input debounce interval
+  btnLightControl.interval(50);
+  btnFan1.interval(50);
+  btnFan2.interval(50);
+  btnFan3.interval(50);
+  btnFan4.interval(50);
 
-  // Serial.begin(115200); // for serial monitor output
-  debugSerial.begin(115200); // for serial monitor output
-  debugSerial.println("Hob2Hood Starting ...");
+  // Set default state
+  if (btnLightControl.read() == HIGH)
+  {
+    manualLightState = true;
+    lastManualLightState = true;
+    setLightState(true);
+  }
+  else
+  {
+    manualLightState = false;
+    lastManualLightState = false;
+    setLightState(false);
+  }
 
-  // Serial.println(" ... Setup IR receiver");
-  irrecv.enableIRIn(); // Start the IR receiver
-  // Serial.println("Hob2Hood ready ...");
+  if (btnFan1.read() == HIGH)
+  {
+    lastManualFanSpeed = 1;
+    manualFanSpeed = 1;
+    setFanSpeed(1);
+  }
+  else if (btnFan2.read() == HIGH)
+  {
+    lastManualFanSpeed = 2;
+    manualFanSpeed = 2;
+    setFanSpeed(2);
+  }
+  else if (btnFan3.read() == HIGH)
+  {
+    lastManualFanSpeed = 3;
+    manualFanSpeed = 3;
+    setFanSpeed(3);
+  }
+  else if (btnFan4.read() == HIGH)
+  {
+    lastManualFanSpeed = 4;
+    manualFanSpeed = 4;
+    setFanSpeed(4);
+  }
+  else
+  {
+    lastManualFanSpeed = 0;
+    manualFanSpeed = 0;
+    setFanSpeed(0);
+  }
+
+  if (!manualLightState && manualFanSpeed == 0)
+  {
+    Serial.println("Manual control not used. Starting IR receiver.");
+    irrecv.enableIRIn();
+  }
 }

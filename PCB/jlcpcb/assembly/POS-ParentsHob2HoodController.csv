@@ -1,0 +1,23 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,100nF,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,64.77,-30.607,180.0,top
+C3,22pF,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,69.342,-25.908,-90.0,top
+C4,22pF,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,54.864,-25.908,90.0,top
+C5,100nF,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,64.0334,-44.7294,0.0,top
+C6,10uF,CP_Radial_D4.0mm_P1.50mm,59.563,-44.743401,-90.0,top
+C7,10uF,CP_Radial_D4.0mm_P1.50mm,58.674,-30.099,180.0,top
+D1,LED_PWR,LED_1206_3216Metric,50.673,-23.495,90.0,top
+J1,Programming_Header,IDC-Header_2x03_P2.54mm_Vertical,51.821,-57.9215,-90.0,top
+J2,FromController,IDC-Header_2x05_P2.54mm_Vertical,32.7715,-41.783,180.0,top
+J3,ToRelays,IDC-Header_2x05_P2.54mm_Vertical,88.6555,-31.623,0.0,top
+J4,Conn_IR,TerminalBlock_Phoenix_MKDS-3-3-5.08_1x03_P5.08mm_Horizontal,66.421,-59.563,0.0,top
+J5,Conn_ExtraFan,TerminalBlock_Phoenix_MKDS-3-3-5.08_1x03_P5.08mm_Horizontal,81.661,-59.563,0.0,top
+J6,Conn_01x02,PinHeader_1x02_P2.54mm_Vertical,44.577,-22.23,0.0,top
+J7,Conn_01x06,PinSocket_1x06_P2.54mm_Vertical,70.891,-22.073,90.0,top
+Q1,AO3400A,SOT-23,70.104,-45.085,-90.0,top
+R1,1k,LED_1206_3216Metric,48.006,-23.495,90.0,top
+R3,10k,R_0805_2012Metric_Pad1.20x1.40mm_HandSolder,32.6898,-55.7276,0.0,top
+RN1,10K,R_Array_SIP9,80.137,-26.528,-90.0,top
+RN2,10K,R_Array_SIP9,40.147,-26.528,-90.0,top
+SW1,SW_SPST,SW_Push_SPST_NO_Alps_SKRK,31.75,-52.705,180.0,top
+U3,ATmega328P-AU,TQFP-32_7x7mm_P0.8mm,64.7864,-37.3424,-90.0,top
+Y1,Crystal_Small,Crystal_HC49-U_Vertical,64.553,-24.892,180.0,top
